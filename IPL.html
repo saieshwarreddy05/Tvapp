@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Stream Player</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script> <!-- SheetJS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body { text-align: center; font-family: Arial, sans-serif; background-color: #222; color: white; }
+        .container { display: flex; flex-direction: column; align-items: center; margin-top: 30px; }
+        .channel-list { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
+        .channel { cursor: pointer; margin: 10px; text-align: center; }
+        .channel img { width: 120px; height: auto; border-radius: 10px; transition: 0.3s; }
+        .channel img:hover { transform: scale(1.1); }
+        .video-container { display: none; margin-top: 20px; }
+        video { width: 90%; max-width: 800px; border-radius: 10px; }
+        button { margin-top: 10px; padding: 10px 20px; font-size: 16px; cursor: pointer; background: #f00; color: white; border: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+    <h1>Live Stream Player</h1>
+    <p>Loading channels from GitHub...</p>
+
+    <!-- Dynamic Channel List -->
+    <div class="container">
+        <h2>Channels</h2>
+        <div id="channel-list" class="channel-list"></div>
+    </div>
+
+    <!-- Video Player (Initially Hidden) -->
+    <div id="video-container" class="video-container">
+        <h2>Live Stream</h2>
+        <video id="video" controls autoplay></video>
+        <br>
+        <button onclick="stopStream()">🔙 Back to Home</button>
+    </div>
+
+    <script>
+        var video = document.getElementById("video");
+        var videoContainer = document.getElementById("video-container");
+        var channelList = document.getElementById("channel-list");
+
+        function startStream(m3u8Link) {
+            if (!m3u8Link) {
+                alert("Invalid M3U8 link!");
+                return;
+            }
+
+            document.querySelector(".container").style.display = "none";
+            videoContainer.style.display = "block";
+
+            if (Hls.isSupported()) {
+                var hls = new Hls();
+                hls.loadSource(m3u8Link);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    video.play();
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = m3u8Link;
+                video.addEventListener('loadedmetadata', function() {
+                    video.play();
+                });
+            }
+        }
+
+        function stopStream() {
+            video.pause();
+            videoContainer.style.display = "none";
+            document.querySelector(".container").style.display = "flex";
+        }
+
+        async function loadExcelFromGitHub() {
+            try {
+                const response = await fetch("https://raw.githubusercontent.com/saieshwarreddy05/Tvapp/main/channels.xlsx");
+                const data = await response.arrayBuffer();
+                const workbook = XLSX.read(data, { type: "array" });
+
+                const sheetName = workbook.SheetNames[0];
+                const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+                channelList.innerHTML = ""; // Clear existing channels
+                
+                sheet.forEach(channel => {
+                    var div = document.createElement("div");
+                    div.className = "channel";
+                    div.innerHTML = `<img src="${channel['png link']}" alt="${channel['Channel_name']}">
+                                     <p>${channel['Channel_name']}</p>`;
+                    div.onclick = () => startStream(channel['m3u8']);
+                    channelList.appendChild(div);
+                });
+
+                document.querySelector("p").textContent = "Channels loaded successfully!";
+            } catch (error) {
+                console.error("Error loading Excel:", error);
+                document.querySelector("p").textContent = "Failed to load channels.";
+            }
+        }
+
+        // Auto-load channels on page load
+        window.onload = loadExcelFromGitHub;
+    </script>
+
+</body>
+</html>
